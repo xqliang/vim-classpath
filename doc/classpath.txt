@@ -16,4 +16,8 @@ or Leiningen for the class path.  If neither is available, $CLASSPATH is used.
 :Java [args]            Execute $JAVA_CMD (default: java) with a class path
                         derived from the current buffer's path.
 
+                                                *classpath-:Javac*
+:Javac [args]           Execute $JAVAC_CMD (default: javac) with a class path
+                        derived from the current buffer's path.
+
  vim:tw=78:et:ft=help:norl:

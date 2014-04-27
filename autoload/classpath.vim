@@ -52,6 +52,77 @@ function! classpath#from_vim(path) abort
   return join(path, classpath#separator())
 endfunction
 
+function! classpath#detect_out(...) abort
+  let buffer = a:0 ? a:1 : '%'
+  let root = getbufvar(buffer, 'java_root')
+  if root ==# ''
+    let root = simplify(fnamemodify(bufname(buffer), ':p:s?[\/]$??'))
+  endif
+
+  if !isdirectory(fnamemodify(root, ':h'))
+    return ''
+  endif
+
+  let previous = ""
+  while root !=# previous
+    if filereadable(root . '/.classpath') && has('python')
+      python << EOP
+import os
+import vim
+from xml.dom import minidom
+
+file = vim.eval("root.'/.classpath'")
+dom = minidom.parse(file)
+for node in dom.getElementsByTagName('classpathentry'):
+  kind = node.attributes['kind'].value
+  path = node.attributes['path'].value
+  path = os.path.join(os.path.dirname(file), path)
+  if kind == 'output':
+    vim.command("return '%s'" % path)
+EOP
+    endif
+    let previous = root
+    let root = fnamemodify(root, ':h')
+  endwhile
+  return ''
+endfunction
+
+function! classpath#detect_src(...) abort
+  let buffer = a:0 ? a:1 : '%'
+  let root = getbufvar(buffer, 'java_root')
+  if root ==# ''
+    let root = simplify(fnamemodify(bufname(buffer), ':p:s?[\/]$??'))
+  endif
+
+  if !isdirectory(fnamemodify(root, ':h'))
+    return ''
+  endif
+
+  let previous = ""
+  while root !=# previous
+    if filereadable(root . '/.classpath') && has('python')
+      let out = ''
+      python << EOP
+import os
+import vim
+from xml.dom import minidom
+
+file = vim.eval("root.'/.classpath'")
+dom = minidom.parse(file)
+for node in dom.getElementsByTagName('classpathentry'):
+  kind = node.attributes['kind'].value
+  path = node.attributes['path'].value
+  path = os.path.join(os.path.dirname(file), path)
+  if kind == 'src':
+    vim.command("return '%s'" % path)
+EOP
+    endif
+    let previous = root
+    let root = fnamemodify(root, ':h')
+  endwhile
+  return ''
+endfunction
+
 function! classpath#detect(...) abort
   let sep = classpath#file_separator()
 
@@ -89,6 +160,27 @@ function! classpath#detect(...) abort
       endif
       let default = base . default
       break
+    endif
+    if filereadable(root . '/.classpath') && has('python')
+      let path = ''
+      python << EOP
+import os
+import vim
+from xml.dom import minidom
+
+file = vim.eval("root.'/.classpath'")
+default = vim.eval("default")
+dom = minidom.parse(file)
+paths = default.split(',') + ['.']
+for node in dom.getElementsByTagName('classpathentry'):
+  kind = node.attributes['kind'].value
+  path = node.attributes['path'].value
+  path = os.path.join(os.path.dirname(file), path)
+  if kind == 'lib':
+    paths.append(path)
+vim.command("let path = '%s'" % ','.join(paths))
+EOP
+      return path
     endif
     let previous = root
     let root = fnamemodify(root, ':h')
@@ -141,6 +233,19 @@ endfunction
 function! classpath#java_cmd(...)
   let path = classpath#from_vim(a:0 ? a:1 : &path)
   return (exists('$JAVA_CMD') ? $JAVA_CMD : 'java') . ' -cp '.shellescape(path)
+endfunction
+
+function! classpath#javac_cmd(...)
+  let path = classpath#from_vim(a:0 ? a:1 : &path)
+  let out = ''
+  let src = ''
+  if exists('g:classpath_out') && !empty(g:classpath_out)
+    let out = ' -d ' . shellescape(g:classpath_out)
+  endif
+  if exists('g:classpath_src') && !empty(g:classpath_src)
+    let src = ' -sourcepath ' . shellescape(g:classpath_src)
+  endif
+  return (exists('$JAVAC_CMD') ? $JAVAC_CMD : 'javac') . src . ' -cp '.shellescape(path) . out
 endfunction
 
 " vim:set et sw=2:
