@@ -8,7 +8,9 @@ let g:loaded_classpath = 1
 
 augroup classpath
   autocmd!
-  autocmd BufEnter *.java let g:vjde_lib_path=classpath#from_vim(classpath#detect())
+  autocmd BufEnter *.java let g:vjde_lib_path=classpath#from_vim(classpath#detect()) |
+        \ let g:vjde_out_path=classpath#detect_out() |
+        \ let g:vjde_src_path=classpath#detect_src()
   autocmd FileType clojure,groovy,java,scala
         \ if expand('%:p') =~# '^zipfile:' |
         \   let &l:path = getbufvar('#', '&path') |
